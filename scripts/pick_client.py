@@ -51,6 +51,7 @@ class SphericalService(object):
 		rospy.loginfo("Finished SphericalService constructor")
                 self.place_gui = rospy.Service("/place_gui", Empty, self.start_aruco_place)
                 self.pick_gui = rospy.Service("/pick_gui", Empty, self.start_aruco_pick)
+                self.pick_gui = rospy.Service("/prepare_robot", Empty, self.prepare_robot)
 
 	def start_aruco_pick(self, req):
 		self.pick_type.pick_aruco("pick")
@@ -59,6 +60,10 @@ class SphericalService(object):
 	def start_aruco_place(self, req):
 		self.pick_type.pick_aruco("place")
 		return {}
+
+        def prepare_robot(self,req):
+            self.pick_type.prepare_robot()
+            return {}
 
 class PickAruco(object):
 	def __init__(self):
@@ -101,7 +106,6 @@ class PickAruco(object):
 		return s[1:] if s.startswith("/") else s
 		
 	def pick_aruco(self, string_operation):
-		self.prepare_robot()
 
 		rospy.sleep(2.0)
 		rospy.loginfo("spherical_grasp_gui: Waiting for an aruco detection")
