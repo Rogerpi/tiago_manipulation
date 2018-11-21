@@ -91,8 +91,11 @@ def createPlaceGoal(place_pose,
 
 class PickAndPlaceServer(object):
     def __init__(self):
+
         rospy.loginfo("Initalizing PickAndPlaceServer...")
         self.sg = SphericalGrasps()
+
+        #Actions Client
         rospy.loginfo("Connecting to pickup AS")
         self.pickup_ac = SimpleActionClient('/pickup', PickupAction)
         self.pickup_ac.wait_for_server()
@@ -101,7 +104,9 @@ class PickAndPlaceServer(object):
         self.place_ac = SimpleActionClient('/place', PlaceAction)
         self.place_ac.wait_for_server()
         rospy.loginfo("Succesfully connected.")
+
         self.scene = PlanningSceneInterface()
+        #Service Proxy
         rospy.loginfo("Connecting to /get_planning_scene service")
         self.scene_srv = rospy.ServiceProxy(
             '/get_planning_scene', GetPlanningScene)
@@ -114,7 +119,7 @@ class PickAndPlaceServer(object):
         self.clear_octomap_srv.wait_for_service()
         rospy.loginfo("Connected!")
 
-                # Get the object size
+        # Get the object size
         self.object_height = rospy.get_param('~object_height')
         self.object_width = rospy.get_param('~object_width')
         self.object_depth = rospy.get_param('~object_depth')
@@ -126,6 +131,7 @@ class PickAndPlaceServer(object):
         else:
             rospy.loginfo("Found links to allow contacts: " + str(self.links_to_allow_contact))
 
+        #Action Server
         self.pick_as = SimpleActionServer(
             '/pickup_pose', PickUpPoseAction,
             execute_cb=self.pick_cb, auto_start=False)
@@ -135,6 +141,11 @@ class PickAndPlaceServer(object):
             '/place_pose', PickUpPoseAction,
             execute_cb=self.place_cb, auto_start=False)
         self.place_as.start()
+
+        #Services
+        self.clean_scene_srv = rospy.Service("/manipulation/clean_scene", Empty, self.clean_scene_srv_call)
+        self.create_scene_srv = rospy.Service("/manipulation/create_scene", Empty, self.create_scene_srv_call)
+
 
     def pick_cb(self, goal):
         """
@@ -185,10 +196,7 @@ class PickAndPlaceServer(object):
         rospy.loginfo("Clearing octomap")
         self.clear_octomap_srv.call(EmptyRequest())
 
-
         semantic_map = rospy.wait_for_message('/semantic_map/map', ObjectArray)
-
-        self.fill_scene(semantic_map)
         rospy.loginfo("Add Object: %s", object_pose.pose)
         object_selected = next((x for x in semantic_map.objects if x.id == object_name), None)
         self.scene_add_object(object_selected)
@@ -259,7 +267,8 @@ class PickAndPlaceServer(object):
 
     def clear_scene(self):
         rospy.loginfo("Clear Scene")
-        self.scene.clear()
+        #self.scene.clear()
+        self.scene.remove_world_object()
         rospy.sleep(2.0) # Wait
 
 
@@ -293,7 +302,7 @@ class PickAndPlaceServer(object):
         for object in semantic_map.objects:
             if object.type == "Furniture":
                 self.scene_add_object(object)
-                last_id == object.name
+                last_id = object.name
 
         rospy.loginfo("Semantic Map completed")
 
@@ -301,6 +310,18 @@ class PickAndPlaceServer(object):
         rospy.loginfo("Wait for the scene to appear...")
         self.wait_for_planning_scene_object(last_id)
         rospy.loginfo("Done!")
+
+
+    def create_scene_srv_call(self,call):
+        self.clear_scene()
+        semantic_map = rospy.wait_for_message('/semantic_map/map', ObjectArray)
+        self.fill_scene(semantic_map)
+        return {}
+
+    def clean_scene_srv_call(self,call):
+        self.clear_scene()
+        return {}
+
 
 if __name__ == '__main__':
     rospy.init_node('pick_and_place_server')
