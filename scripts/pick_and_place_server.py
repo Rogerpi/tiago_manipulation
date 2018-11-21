@@ -264,24 +264,20 @@ class PickAndPlaceServer(object):
 
 
     def scene_add_object(self,object):
+        poseSt = PoseStamped()
         if object.seen:
-            pose = object.current_position
+            poseStpose = object.current_position
         elif object.mapped:
-            pose = object.mapped_position
+            poseSt.pose = object.mapped_position
         else:
             print("Not mapped or detected!")
             return
-        s = SolidPrimitive()
+
+        poseSt.header = object.header
         if len(object.size) < 3:
-            rospy.loginfo("Furniture: "+str(object.name)+" has no size. Using Defaults...")
-            s.dimensions = [5,5,5] # TODO remove this please I beg
+            self.scene.add_box(object.name, copy.deepcopy(poseSt), (0.2,0.2,0.2))
         else:
-            s.dimensions = [object.size[0],object.size[1],object.size[2]]
-        s.type = s.BOX
-        ps = PoseStamped()
-        ps.header.frame_id = object.header.frame_id #Not used....
-        ps.pose = copy.deepcopy(pose)
-        self.scene.addSolidPrimitive(object.name, s, ps.pose, True) # Objects and Furniture cannot share id right now
+            self.scene.add_box(object.name, copy.deepcopy(poseSt), (object.size[0],object.size[1],object.size[2]))
         rospy.loginfo("Added "+str(object.name))
 
 
