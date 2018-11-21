@@ -35,6 +35,10 @@ from copy import deepcopy
 from random import shuffle
 import copy
 
+from robot_map.msg import Object, ObjectArray
+
+from shape_msgs.msg import MeshTriangle, Mesh, SolidPrimitive, Plane
+
 moveit_error_dict = {}
 for name in MoveItErrorCodes.__dict__.keys():
 	if not name[:1] == '_':
@@ -176,42 +180,29 @@ class PickAndPlaceServer(object):
 
 		rospy.loginfo("'" + object_name + "'' is in scene!")
 
-	def grasp_object(self, object_pose):
-		rospy.loginfo("Removing any previous 'part' object")
-		self.scene.remove_attached_object("arm_tool_link")
-		self.scene.remove_world_object("part")
-		self.scene.remove_world_object("table")
-		rospy.loginfo("Clearing octomap")
-		self.clear_octomap_srv.call(EmptyRequest())
-		rospy.sleep(2.0)  # Removing is fast
-		rospy.loginfo("Adding new 'part' object")
+        def grasp_object(self, object_pose,object_name = "bottle"): #Just in case...
 
-		rospy.loginfo("Object pose: %s", object_pose.pose)
-		
+                rospy.loginfo("Clearing octomap")
+                self.clear_octomap_srv.call(EmptyRequest())
+
+
+                semantic_map = rospy.wait_for_message('/semantic_map/map', ObjectArray)
+
+                self.fill_scene(semantic_map)
+                rospy.loginfo("Add Object: %s", object_pose.pose)
+                object_selected = next((x for x in semantic_map.objects if x.id == object_name), None)
+                self.scene_add_object(object_selected)
+                rospy.loginfo("Target Object loaded")
                 #Add object description in scene
-                self.scene.add_box("part", object_pose, (self.object_depth, self.object_width, self.object_height))
 
-		rospy.loginfo("Second%s", object_pose.pose)
-		table_pose = copy.deepcopy(object_pose)
-
-                #define a virtual table below the object
-                table_height = object_pose.pose.position.z - self.object_width/2  
-                table_width  = 1.8
-                table_depth  = 0.5
-                table_pose.pose.position.z += -(2*self.object_width)/2 -table_height/2
-                table_height -= 0.008 #remove few milimeters to prevent contact between the object and the table
-
-		self.scene.add_box("table", table_pose, (table_depth, table_width, table_height))
-
-		# # We need to wait for the object part to appear
-		self.wait_for_planning_scene_object()
-		self.wait_for_planning_scene_object("table")
+                # # We need to wait for the object part to appear
+                #self.wait_for_planning_scene_object()
 
                 # compute grasps
 		possible_grasps = self.sg.create_grasps_from_object_pose(object_pose)
 		self.pickup_ac
 		goal = createPickupGoal(
-			"arm_torso", "part", object_pose, possible_grasps, self.links_to_allow_contact)
+                        "arm_torso", object_name, object_pose, possible_grasps, self.links_to_allow_contact)
 		
                 rospy.loginfo("Sending goal")
 		self.pickup_ac.send_goal(goal)
@@ -265,6 +256,55 @@ class PickAndPlaceServer(object):
 
 		return result.error_code.val
 
+
+        def clear_scene(self):
+            rospy.loginfo("Clear Scene")
+            self.scene.clear()
+            rospy.sleep(2.0) # Wait
+
+
+        def scene_add_object(self,object):
+            if object.seen:
+                pose = object.current_position
+            elif object.mapped:
+                pose = object.mapped_position
+            else:
+                print("Not mapped or detected!")
+                return
+            s = SolidPrimitive()
+            if len(object.size) < 3:
+                rospy.loginfo("Furniture: "+str(object.name)+" has no size. Using Defaults...")
+                s.dimensions = [5,5,5] # TODO remove this please I beg
+            else:
+                s.dimensions = [object.size[0],object.size[1],object.size[2]]
+            s.type = s.BOX
+            ps = PoseStamped()
+            ps.header.frame_id = object.header.frame_id #Not used....
+            ps.pose = copy.deepcopy(pose)
+            self.scene.addSolidPrimitive(object.name, s, ps.pose, True) # Objects and Furniture cannot share id right now
+            rospy.loginfo("Added "+str(object.name))
+
+
+        def fill_scene(self,semantic_map):
+            #self.clear_scene()
+
+
+            rospy.loginfo("Adding Semantic Map...")
+            rospy.loginfo("Waiting for msg...")
+
+            last_id = ""
+
+            for object in semantic_map.objects:
+                if object.type == "Furniture":
+                    self.scene_add_object(object)
+                    last_id == object.name
+
+            rospy.loginfo("Semantic Map completed")
+
+
+            rospy.loginfo("Wait for the scene to appear...")
+            self.wait_for_planning_scene_object(last_id)
+            rospy.loginfo("Done!")
 
 if __name__ == '__main__':
 	rospy.init_node('pick_and_place_server')

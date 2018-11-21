@@ -11,6 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   std_srvs
+  robot_map
+  shape_msgs
 )
 
 
