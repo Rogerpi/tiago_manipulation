@@ -47,7 +47,7 @@ for name in MoveItErrorCodes.__dict__.keys():
 class SphericalService(object):
 	def __init__(self):
 		rospy.loginfo("Starting Spherical Grab Service")
-		self.pick_type = PickAruco()
+                self.pick_type = PickObject()
 		rospy.loginfo("Finished SphericalService constructor")
                 self.place_gui = rospy.Service("/place_gui", Empty, self.start_aruco_place)
                 self.pick_gui = rospy.Service("/pick_gui", Empty, self.start_aruco_pick)
@@ -65,7 +65,7 @@ class SphericalService(object):
             self.pick_type.prepare_robot()
             return {}
 
-class PickAruco(object):
+class PickObject(object):
 	def __init__(self):
 		rospy.loginfo("Initalizing...")
                 self.bridge = CvBridge()
@@ -100,7 +100,7 @@ class PickAruco(object):
 			exit()
 		rospy.loginfo("Connected!")
 		rospy.sleep(1.0)
-		rospy.loginfo("Done initializing PickAruco.")
+                rospy.loginfo("Done initializing PickObject.")
 
    	def strip_leading_slash(self, s):
 		return s[1:] if s.startswith("/") else s
