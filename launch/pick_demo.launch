@@ -2,7 +2,7 @@
 <launch>
 
   <arg name="rviz"  default="false"/>
-  <arg name="aruco" default="true"/>
+  <arg name="aruco" default="false"/>
   <!-- marker detector -->
     <group if="$(arg aruco)">
   <node pkg="aruco_ros" type="single"  name="aruco_single">

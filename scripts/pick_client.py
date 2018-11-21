@@ -49,16 +49,17 @@ class SphericalService(object):
 		rospy.loginfo("Starting Spherical Grab Service")
                 self.pick_type = PickObject()
 		rospy.loginfo("Finished SphericalService constructor")
-                self.place_gui = rospy.Service("/place_gui", Empty, self.start_aruco_place)
-                self.pick_gui = rospy.Service("/pick_gui", Empty, self.start_aruco_pick)
+                self.place_gui = rospy.Service("/manipulation/place", Empty, self.start_object_place)
+                self.pick_gui = rospy.Service("/manipulation/pick", Empty, self.start_object_pick)
                 self.pick_gui = rospy.Service("/prepare_robot", Empty, self.prepare_robot)
 
-	def start_aruco_pick(self, req):
-		self.pick_type.pick_aruco("pick")
+
+        def start_object_pick(self, req):
+                self.pick_type.pick_object("pick")
 		return {}
 
-	def start_aruco_place(self, req):
-		self.pick_type.pick_aruco("place")
+        def start_object_place(self, req):
+                self.pick_type.pick_object("place")
 		return {}
 
         def prepare_robot(self,req):
@@ -88,7 +89,7 @@ class PickObject(object):
 			'/torso_controller/command', JointTrajectory, queue_size=1)
 		self.head_cmd = rospy.Publisher(
 			'/head_controller/command', JointTrajectory, queue_size=1)
-		self.detected_pose_pub = rospy.Publisher('/detected_aruco_pose',
+                self.detected_pose_pub = rospy.Publisher('/manipulation/goal',
 							 PoseStamped,
 							 queue_size=1,
 							 latch=True)
@@ -105,45 +106,45 @@ class PickObject(object):
    	def strip_leading_slash(self, s):
 		return s[1:] if s.startswith("/") else s
 		
-	def pick_aruco(self, string_operation):
+        def pick_object(self, string_operation):
 
 		rospy.sleep(2.0)
-		rospy.loginfo("spherical_grasp_gui: Waiting for an aruco detection")
+                rospy.loginfo("spherical_grasp_gui: Waiting for an object detection")
 
-		aruco_pose = rospy.wait_for_message('/aruco_single/pose', PoseStamped)
-		aruco_pose.header.frame_id = self.strip_leading_slash(aruco_pose.header.frame_id)
-		rospy.loginfo("Got: " + str(aruco_pose))
+                object_pose = rospy.wait_for_message('/manipulation/goal', PoseStamped)
+                object_pose.header.frame_id = self.strip_leading_slash(object_pose.header.frame_id)
+                rospy.loginfo("Got: " + str(object_pose))
 
 
 		rospy.loginfo("spherical_grasp_gui: Transforming from frame: " +
-		aruco_pose.header.frame_id + " to 'base_footprint'")
+                object_pose.header.frame_id + " to 'base_footprint'")
 		ps = PoseStamped()
-		ps.pose.position = aruco_pose.pose.position
-		ps.header.stamp = self.tfBuffer.get_latest_common_time("base_footprint", aruco_pose.header.frame_id)
-		ps.header.frame_id = aruco_pose.header.frame_id
+                ps.pose.position = object_pose.pose.position
+                ps.header.stamp = self.tfBuffer.get_latest_common_time("base_footprint", object_pose.header.frame_id)
+                ps.header.frame_id = object_pose.header.frame_id
 		transform_ok = False
 		while not transform_ok and not rospy.is_shutdown():
 			try:
 				transform = self.tfBuffer.lookup_transform("base_footprint", 
 									   ps.header.frame_id,
 									   rospy.Time(0))
-				aruco_ps = do_transform_pose(ps, transform)
+                                object_ps = do_transform_pose(ps, transform)
 				transform_ok = True
 			except tf2_ros.ExtrapolationException as e:
 				rospy.logwarn(
 					"Exception on transforming point... trying again \n(" +
 					str(e) + ")")
 				rospy.sleep(0.01)
-				ps.header.stamp = self.tfBuffer.get_latest_common_time("base_footprint", aruco_pose.header.frame_id)
+                                ps.header.stamp = self.tfBuffer.get_latest_common_time("base_footprint", object_pose.header.frame_id)
 			pick_g = PickUpPoseGoal()
 
 		if string_operation == "pick":
 
-                        rospy.loginfo("Setting cube pose based on ArUco detection")
-			pick_g.object_pose.pose.position = aruco_ps.pose.position
+                        rospy.loginfo("Setting cube pose based on object detection")
+                        pick_g.object_pose.pose.position = object_ps.pose.position
                         pick_g.object_pose.pose.position.z -= 0.1*(1.0/2.0)
 
-                        rospy.loginfo("aruco pose in base_footprint:" + str(pick_g))
+                        rospy.loginfo("object pose in base_footprint:" + str(pick_g))
 
 			pick_g.object_pose.header.frame_id = 'base_footprint'
 			pick_g.object_pose.pose.orientation.w = 1.0
@@ -209,7 +210,7 @@ class PickObject(object):
 
 
 if __name__ == '__main__':
-	rospy.init_node('pick_aruco_demo')
+        rospy.init_node('pick_object_demo')
 	sphere = SphericalService()
 	rospy.spin()
 
