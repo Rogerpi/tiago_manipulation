@@ -51,7 +51,7 @@ class SphericalService(object):
 		rospy.loginfo("Finished SphericalService constructor")
                 self.place_gui = rospy.Service("/manipulation/place", Empty, self.start_object_place)
                 self.pick_gui = rospy.Service("/manipulation/pick", Empty, self.start_object_pick)
-                self.pick_gui = rospy.Service("/prepare_robot", Empty, self.prepare_robot)
+                self.pick_gui = rospy.Service("/manipulation/prepare_robot", Empty, self.prepare_robot)
 
 
         def start_object_pick(self, req):
