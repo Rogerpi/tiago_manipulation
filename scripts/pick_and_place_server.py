@@ -56,8 +56,8 @@ def createPickupGoal(group="arm_torso", target="part",
 	pug.planning_options.planning_scene_diff.robot_state.is_diff = True
 	pug.planning_options.plan_only = False
 	pug.planning_options.replan = True
-	pug.planning_options.replan_attempts = 1  # 10
-	pug.allowed_touch_objects = []
+        pug.planning_options.replan_attempts = 5
+        pug.allowed_touch_objects = [target]
 	pug.attached_object_touch_links = ['<octomap>']
 	pug.attached_object_touch_links.extend(links_to_allow_contact)
 
@@ -189,7 +189,7 @@ class PickAndPlaceServer(object):
 		rospy.loginfo("Object pose: %s", object_pose.pose)
 		
                 #Add object description in scene
-		self.scene.add_box("part", object_pose, (self.object_depth, self.object_width, self.object_height))
+                self.scene.add_box("part", object_pose, (self.object_depth, self.object_width, self.object_height))
 
 		rospy.loginfo("Second%s", object_pose.pose)
 		table_pose = copy.deepcopy(object_pose)
